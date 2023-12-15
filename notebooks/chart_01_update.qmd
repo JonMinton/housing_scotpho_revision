@@ -1,0 +1,46 @@
+---
+title: "Checking and updating Chart 1"
+format: html
+editor: visual
+---
+
+## Aims
+
+-   Recreate chart 1
+-   Update chart 1
+-   Save data in standard way
+
+## Data wrangling
+
+```{r}
+library(tidyverse)
+library(readxl)
+
+sht <- readxl::read_excel("../data/September+2023+-+Affordable+Housing+Supply+New+Style+-+Accessible.xlsx", sheet = "Completions - finyear", range = "A4:X28") |> 
+  pivot_longer(-`Type of AHSP activity`,names_to = "fin_year", values_to = "completions") |> 
+  janitor::clean_names()
+
+```
+
+Now to visualise. Does this look as before?
+
+```{r}
+sht |> 
+  filter(type_of_ahsp_activity %in% c("Total Social Rent", "Total Affordable Rent", "Total Affordable Home Ownership")) |> 
+  mutate(
+    year = str_extract(fin_year, "^[0-9]{4}") |> as.numeric()
+  ) |> 
+  ggplot(aes(x = year, y = completions, colour = type_of_ahsp_activity)) + 
+  geom_line()
+```
+
+Good. This confirms the data are the same, and also shows where the trends have changed over time.
+
+```{r}
+
+sht |> filter(type_of_ahsp_activity %in% c("Total Social Rent", "Total Affordable Rent", "Total Affordable Home Ownership")) |> 
+  mutate(
+    year = str_extract(fin_year, "^[0-9]{4}") |> as.numeric()
+  ) |> write_csv(here::here("data_for_charts", "chart_01_data.csv"))
+
+```

@@ -1,0 +1,208 @@
+---
+title: "Checking and updating Chart 2"
+format: html
+editor: visual
+---
+
+## Data wrangling
+
+```{r}
+library(tidyverse)
+library(readxl)
+
+sht <- readxl::read_excel(  
+  path = here::here("data", "Stock+by+Tenure+-+Scotland+1993-2020+%26+Local+Authorities+2013-2020 (1).xls"), 
+  sheet = "Tbl Stock by Tenure",
+  range = "A7:O34",
+  col_names = FALSE
+)
+
+names(sht) <- c(
+  "Year",
+  "Total number of dwellings (000s)",
+  "Total number of occupied dwellings (000s)",
+  "Total number of vacant dwellings (000s)",
+  "Privately owned dwellings | Total number occupied dwellings",
+  "Privately owned dwellings | Owner occupied | Number",
+  "Privately owned dwellings | Owner occupied | Percentage",
+  "Privately owned dwellings | Rented property with a job/business | Number",
+  "Privately owned dwellings | Rented property with a job/business | Percentage",
+  "Privately owned dwellings | Vacant private dwellings and second homes | Number",
+  "Privately owned dwellings | Vacant private dwellings and second homes | Percentage",
+  "Social rented dwellings | From housing associations | Number",
+  "Social rented dwellings | From housing associations | Percentage",
+  "Social rented dwellings | From local authorities, New Towns, Scottish Homes | Number",
+  "Social rented dwellings | From local authorities, New Towns, Scottish Homes | Percentage"
+)
+
+sht |> 
+  mutate(finyear_start = lubridate::my(Year))
+```
+
+The categories are different to previous version. No distinction between with and without mortgate. But let's see what it shows regardless:
+
+```{r}
+sht |> 
+  pivot_longer(-Year, names_to = "Category", values_to = "value")
+```
+
+Total number of dwellings by occupied or not occupied
+
+```{r}
+sht |> 
+  pivot_longer(-Year, names_to = "Category", values_to = "value") |> 
+  filter(
+    Category %in% c("Total number of dwellings (000s)", "Total number of occupied dwellings (000s)", "Total number of vacant dwellings (000s)")
+  ) |> 
+  mutate(
+    cat = janitor::make_clean_names(Category)
+  ) |> 
+  mutate(finyear_start = lubridate::my(Year)) |> 
+  ggplot(aes(x = finyear_start, y = value, group = Category, colour = Category, shape = Category)) + 
+  geom_line() + geom_point() + 
+  labs(
+    x = "Year",
+    y = "Number of dwellings (000s)",
+    title = "Total number of dwellings over time", 
+    caption = "Source: 1991 Census; NRS Dwellings Count; Scottish Household Survey"
+  )
+```
+
+The total number of dwellings continues to rise. There appears no clear trend in the number of vacant dwellings over time.
+
+How about proportion of each type?
+
+```{r}
+cats_of_interest <-
+  c(
+    "Privately owned dwellings | Owner occupied | Number",
+    "Privately owned dwellings | Rented property with a job/business | Number",
+    "Privately owned dwellings | Vacant private dwellings and second homes | Number",
+    "Social rented dwellings | From housing associations | Number",
+    "Social rented dwellings | From local authorities, New Towns, Scottish Homes | Number"
+  )
+
+
+
+sht |> 
+  pivot_longer(-Year, names_to = "Category", values_to = "value") |> 
+  filter(
+    Category %in% cats_of_interest
+  ) |> 
+  mutate(
+    simpler_categories = case_when(
+      Category == "Privately owned dwellings | Owner occupied | Number" ~ "Owner Occupied",
+      Category == "Privately owned dwellings | Rented property with a job/business | Number" ~ "Private Rented",
+      Category %in% c(
+    "Social rented dwellings | From housing associations | Number",
+    "Social rented dwellings | From local authorities, New Towns, Scottish Homes | Number"
+      ) ~ "Social Rented",
+    TRUE ~ "Other"
+    )
+  ) |> 
+  group_by(Year, simpler_categories) |> 
+  summarise(value = sum(value)) |> 
+  ungroup() |> 
+  mutate(finyear_start = lubridate::my(Year)) |> 
+  ggplot(aes(x = finyear_start, y = value, group = simpler_categories, colour = simpler_categories, shape = simpler_categories)) + 
+  geom_line() + geom_point() + 
+  labs(
+    x = "Year",
+    y = "Number of dwellings (000s)",
+    title = "Total number of dwellings over time", 
+    caption = "Source: 1991 Census; NRS Dwellings Count; Scottish Household Survey"
+  )
+```
+
+The number of social rented dwellings fell over the 1990s and 2000s to reach around 600,000 since around 2000. The number of private rented dwellings increased over this period. Owner occupied dwellings show less of a clear trend, but remain the primary type of dwelling in Scotland.
+
+Now as share:
+
+```{r}
+
+cats_of_interest <-
+  c(
+    "Privately owned dwellings | Owner occupied | Number",
+    "Privately owned dwellings | Rented property with a job/business | Number",
+    "Privately owned dwellings | Vacant private dwellings and second homes | Number",
+    "Social rented dwellings | From housing associations | Number",
+    "Social rented dwellings | From local authorities, New Towns, Scottish Homes | Number"
+  )
+
+
+
+sht |> 
+  pivot_longer(-Year, names_to = "Category", values_to = "value") |> 
+  filter(
+    Category %in% cats_of_interest
+  ) |> 
+  mutate(
+    simpler_categories = case_when(
+      Category == "Privately owned dwellings | Owner occupied | Number" ~ "Owner Occupied",
+      Category == "Privately owned dwellings | Rented property with a job/business | Number" ~ "Private Rented",
+      Category %in% c(
+    "Social rented dwellings | From housing associations | Number",
+    "Social rented dwellings | From local authorities, New Towns, Scottish Homes | Number"
+      ) ~ "Social Rented",
+    TRUE ~ "Other"
+    )
+  ) |> 
+  group_by(Year, simpler_categories) |> 
+  summarise(value = sum(value)) |> 
+  ungroup() |> 
+  mutate(finyear_start = lubridate::my(Year)) |> 
+  ggplot(aes(x = finyear_start, y = value, group = simpler_categories, colour = simpler_categories, fill = simpler_categories)) + 
+  geom_col(width = 364) + 
+  labs(
+    x = "Year",
+    y = "Number of dwellings (000s)",
+    title = "Total number of dwellings over time", 
+    caption = "Source: 1991 Census; NRS Dwellings Count; Scottish Household Survey"
+  )
+```
+
+This shows how the categories accumulate.
+
+```{r}
+cats_of_interest <-
+  c(
+    "Privately owned dwellings | Owner occupied | Number",
+    "Privately owned dwellings | Rented property with a job/business | Number",
+    "Privately owned dwellings | Vacant private dwellings and second homes | Number",
+    "Social rented dwellings | From housing associations | Number",
+    "Social rented dwellings | From local authorities, New Towns, Scottish Homes | Number"
+  )
+
+
+
+sht |> 
+  pivot_longer(-Year, names_to = "Category", values_to = "value") |> 
+  filter(
+    Category %in% cats_of_interest
+  ) |> 
+  mutate(
+    simpler_categories = case_when(
+      Category == "Privately owned dwellings | Owner occupied | Number" ~ "Owner Occupied",
+      Category == "Privately owned dwellings | Rented property with a job/business | Number" ~ "Private Rented",
+      Category %in% c(
+    "Social rented dwellings | From housing associations | Number",
+    "Social rented dwellings | From local authorities, New Towns, Scottish Homes | Number"
+      ) ~ "Social Rented",
+    TRUE ~ "Other"
+    )
+  ) |> 
+  group_by(Year, simpler_categories) |> 
+  summarise(value = sum(value)) |> 
+  ungroup() |> 
+  mutate(finyear_start = lubridate::my(Year)) |> 
+  ggplot(aes(x = finyear_start, y = value, group = simpler_categories, colour = simpler_categories, fill = simpler_categories)) + 
+  geom_col(width = 364, position = position_fill()) + 
+  labs(
+    x = "Year",
+    y = "Proportion of dwellings",
+    title = "The changing proportions of dwelling housing types over time", 
+    caption = "Source: 1991 Census; NRS Dwellings Count; Scottish Household Survey"
+  )
+```
+
+This is perhaps the most similar chart to the existing one.
